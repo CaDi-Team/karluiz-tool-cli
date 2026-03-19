@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+'use strict';
+
+const program = require('../src/index');
+
+program.parseAsync(process.argv).catch((err) => {
+  console.error(`Fatal: ${err.message}`);
+  process.exit(1);
+});
