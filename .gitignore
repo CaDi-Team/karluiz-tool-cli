@@ -1,0 +1,11 @@
+# Rust build artifacts
+target/
+
+# Node (legacy, cleaned up)
+node_modules/
+package-lock.json
+
+
+# Added by cargo
+
+/target
