@@ -1,8 +1,7 @@
-# Rust
+# Rust build artifacts
 target/
-Cargo.lock
 
-# Node (legacy, cleaning up)
+# Node (legacy, cleaned up)
 node_modules/
 package-lock.json
 
