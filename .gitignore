@@ -5,3 +5,8 @@ Cargo.lock
 # Node (legacy, cleaning up)
 node_modules/
 package-lock.json
+
+
+# Added by cargo
+
+/target
