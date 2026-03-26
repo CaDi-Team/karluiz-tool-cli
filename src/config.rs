@@ -2,22 +2,26 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-/// Persistent configuration stored in `~/.config/ktool/config.toml`.
+use crate::commands::common::ktool_dir;
+
+/// Persistent configuration stored in `~/.ktool/config.toml`.
+///
+/// The `token` field was removed in v0.2.0 — authentication is now managed
+/// by the auth module. Unknown fields from older configs are silently ignored
+/// thanks to `#[serde(default)]` on every field.
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Config {
-    /// Bearer token used to authenticate against the karluiz API.
-    pub token: Option<String>,
     /// Default application name (`--set-app`).
+    #[serde(default)]
     pub app: Option<String>,
     /// Default environment (`--set-env`).
+    #[serde(default)]
     pub env: Option<String>,
 }
 
 /// Return the path to the config file, creating parent directories if needed.
 pub fn config_path() -> Result<PathBuf, String> {
-    let base = dirs::config_dir()
-        .ok_or_else(|| "Cannot locate the user config directory.".to_string())?;
-    let dir = base.join("ktool");
+    let dir = ktool_dir()?;
     fs::create_dir_all(&dir)
         .map_err(|e| format!("Failed to create config directory {}: {e}", dir.display()))?;
     Ok(dir.join("config.toml"))
@@ -39,20 +43,29 @@ pub(crate) fn load_from(path: &PathBuf) -> Result<Config, String> {
     if !path.exists() {
         return Ok(Config::default());
     }
-    let raw = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {e}", path.display()))?;
-    toml::from_str(&raw).map_err(|e| format!("Failed to parse config: {e}"))
+    let raw =
+        fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {e}", path.display()))?;
+    // Use toml::Value first to strip unknown fields, then deserialize.
+    // This tolerates old configs that still have a `token` field.
+    let table: toml::Value =
+        toml::from_str(&raw).map_err(|e| format!("Failed to parse config: {e}"))?;
+    let cfg: Config = serde::Deserialize::deserialize(table)
+        .map_err(|e| format!("Failed to deserialize config: {e}"))?;
+    Ok(cfg)
 }
 
 pub(crate) fn save_to(path: &PathBuf, cfg: &Config) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create config directory {}: {e}", parent.display()))?;
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "Failed to create config directory {}: {e}",
+                parent.display()
+            )
+        })?;
     }
-    let content = toml::to_string_pretty(cfg)
-        .map_err(|e| format!("Failed to serialise config: {e}"))?;
-    fs::write(path, content)
-        .map_err(|e| format!("Failed to write {}: {e}", path.display()))
+    let content =
+        toml::to_string_pretty(cfg).map_err(|e| format!("Failed to serialise config: {e}"))?;
+    fs::write(path, content).map_err(|e| format!("Failed to write {}: {e}", path.display()))
 }
 
 #[cfg(test)]
@@ -69,7 +82,6 @@ mod tests {
     #[test]
     fn default_config_is_empty() {
         let cfg = Config::default();
-        assert!(cfg.token.is_none());
         assert!(cfg.app.is_none());
         assert!(cfg.env.is_none());
     }
@@ -78,7 +90,6 @@ mod tests {
     fn save_and_load_roundtrip() {
         let (_dir, path) = temp_config_path();
         let cfg = Config {
-            token: Some("tok_test".to_string()),
             app: Some("my-app".to_string()),
             env: Some("prod".to_string()),
         };
@@ -92,5 +103,19 @@ mod tests {
         let (_dir, path) = temp_config_path();
         let result = load_from(&path).unwrap();
         assert_eq!(result, Config::default());
+    }
+
+    #[test]
+    fn tolerates_unknown_fields() {
+        let (_dir, path) = temp_config_path();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            "token = \"old-secret\"\napp = \"my-app\"\nenv = \"prod\"\n",
+        )
+        .unwrap();
+        let loaded = load_from(&path).unwrap();
+        assert_eq!(loaded.app, Some("my-app".to_string()));
+        assert_eq!(loaded.env, Some("prod".to_string()));
     }
 }

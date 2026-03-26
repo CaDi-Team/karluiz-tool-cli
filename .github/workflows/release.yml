@@ -24,22 +24,22 @@ jobs:
           # Linux x86_64 (most CI runners, most dev machines)
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
-            archive: ktool-linux-x86_64.tar.gz
+            archive: ktool-x86_64-unknown-linux-musl.tar.gz
 
           # Linux ARM64 (Graviton, Raspberry Pi 4+, etc.)
           - target: aarch64-unknown-linux-musl
             runner: ubuntu-latest
-            archive: ktool-linux-arm64.tar.gz
+            archive: ktool-aarch64-unknown-linux-musl.tar.gz
 
           # macOS Intel
           - target: x86_64-apple-darwin
             runner: macos-latest
-            archive: ktool-macos-x86_64.tar.gz
+            archive: ktool-x86_64-apple-darwin.tar.gz
 
           # macOS Apple Silicon
           - target: aarch64-apple-darwin
             runner: macos-latest
-            archive: ktool-macos-arm64.tar.gz
+            archive: ktool-aarch64-apple-darwin.tar.gz
 
     steps:
       - uses: actions/checkout@v4

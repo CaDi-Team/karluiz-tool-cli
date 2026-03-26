@@ -39,7 +39,11 @@ pub fn obfuscate(value: &str) -> String {
     if chars.len() <= 4 {
         return "***".to_string();
     }
-    format!("{}***{}", &chars[..2].iter().collect::<String>(), &chars[chars.len() - 2..].iter().collect::<String>())
+    format!(
+        "{}***{}",
+        &chars[..2].iter().collect::<String>(),
+        &chars[chars.len() - 2..].iter().collect::<String>()
+    )
 }
 
 #[cfg(test)]

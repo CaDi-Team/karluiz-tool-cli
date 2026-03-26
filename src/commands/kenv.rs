@@ -29,8 +29,8 @@ pub struct ListArgs {
 
 #[cfg(test)]
 mod tests {
-    use clap::CommandFactory;
     use crate::Cli;
+    use clap::CommandFactory;
 
     #[test]
     fn kenv_set_app_and_set_env_are_optional() {
@@ -53,15 +53,13 @@ mod tests {
 
     #[test]
     fn kenv_set_app_parses() {
-        let r = Cli::command()
-            .try_get_matches_from(["ktool", "kenv", "--set-app=my-app"]);
+        let r = Cli::command().try_get_matches_from(["ktool", "kenv", "--set-app=my-app"]);
         assert!(r.is_ok());
     }
 
     #[test]
     fn kenv_set_env_parses() {
-        let r = Cli::command()
-            .try_get_matches_from(["ktool", "kenv", "--set-env=prod"]);
+        let r = Cli::command().try_get_matches_from(["ktool", "kenv", "--set-env=prod"]);
         assert!(r.is_ok());
     }
 }

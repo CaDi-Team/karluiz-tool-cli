@@ -1,25 +1,35 @@
 mod api;
 mod commands;
 mod config;
+mod migrate;
 
 use clap::{Parser, Subcommand};
+use commands::auth::{AuthCommand, KenvAuthCommand};
 use commands::kenv::{KenvArgs, KenvCommands};
 
 #[derive(Parser)]
-#[command(
-    name = "ktool",
-    about = "CLI for karluiz tools",
-    version
-)]
+#[command(name = "ktool", about = "CLI for karluiz tools", version)]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Authenticate with the karluiz API — saves your token to the local config.
-    Login,
+    /// Print the version string.
+    Version,
+
+    /// Show the karluiz 8-bit hero screen.
+    Cadi,
+
+    /// Self-update to the latest release from GitHub.
+    Update,
+
+    /// Manage authentication credentials.
+    Auth {
+        #[command(subcommand)]
+        cmd: AuthCommand,
+    },
 
     /// Manage the kenv secrets service.
     ///
@@ -29,11 +39,30 @@ pub enum Commands {
 }
 
 fn main() {
+    // Run one-time migration from old config layout.
+    migrate::run();
+
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Login => run_login(),
-        Commands::Kenv(args) => run_kenv(args),
+        None => {
+            // No subcommand: print help.
+            use clap::CommandFactory;
+            Cli::command().print_help().ok();
+            println!();
+            Ok(())
+        }
+        Some(Commands::Version) => {
+            println!("ktool {}", env!("CARGO_PKG_VERSION"));
+            Ok(())
+        }
+        Some(Commands::Cadi) => {
+            commands::cadi::run();
+            Ok(())
+        }
+        Some(Commands::Update) => commands::update::run(),
+        Some(Commands::Auth { cmd }) => run_auth(cmd),
+        Some(Commands::Kenv(args)) => run_kenv(args),
     };
 
     if let Err(e) = result {
@@ -43,24 +72,19 @@ fn main() {
 }
 
 // ---------------------------------------------------------------------------
-// login
+// auth
 // ---------------------------------------------------------------------------
 
-fn run_login() -> Result<(), String> {
-    let token = rpassword::prompt_password("Enter your KENV API token: ")
-        .map_err(|e| format!("Failed to read token: {e}"))?;
-
-    let token = token.trim().to_string();
-    if token.is_empty() {
-        return Err("Token cannot be empty.".to_string());
+fn run_auth(cmd: AuthCommand) -> Result<(), String> {
+    match cmd {
+        AuthCommand::Kenv { cmd } => match cmd {
+            KenvAuthCommand::Login { token } => commands::auth::kenv_login(&token),
+            KenvAuthCommand::Logout => commands::auth::kenv_logout(),
+            KenvAuthCommand::Whoami => commands::auth::kenv_whoami(),
+        },
+        AuthCommand::Status => commands::auth::status(),
+        AuthCommand::Logout => commands::auth::logout_all(),
     }
-
-    let mut cfg = config::load()?;
-    cfg.token = Some(token);
-    config::save(&cfg)?;
-
-    println!("✓ Token saved to {}.", config::config_path()?.display());
-    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +106,7 @@ fn run_kenv(args: KenvArgs) -> Result<(), String> {
     if updated {
         config::save(&cfg)?;
         println!(
-            "✓ Config updated — app: {}, env: {}.",
+            "Config updated -- app: {}, env: {}.",
             cfg.app.as_deref().unwrap_or("(not set)"),
             cfg.env.as_deref().unwrap_or("(not set)"),
         );
@@ -94,7 +118,7 @@ fn run_kenv(args: KenvArgs) -> Result<(), String> {
             if !updated {
                 // No subcommand and no flags: print current context.
                 println!(
-                    "Current context — app: {}, env: {}",
+                    "Current context -- app: {}, env: {}",
                     cfg.app.as_deref().unwrap_or("(not set)"),
                     cfg.env.as_deref().unwrap_or("(not set)"),
                 );
@@ -106,10 +130,7 @@ fn run_kenv(args: KenvArgs) -> Result<(), String> {
 }
 
 fn run_kenv_list(cfg: &config::Config, as_json: bool) -> Result<(), String> {
-    let token = cfg
-        .token
-        .as_deref()
-        .ok_or("No token found. Run `ktool login` first.")?;
+    let token = commands::auth::load_kenv_token()?;
 
     let app = cfg
         .app
@@ -121,13 +142,19 @@ fn run_kenv_list(cfg: &config::Config, as_json: bool) -> Result<(), String> {
         .as_deref()
         .ok_or("No env set. Run `ktool kenv --set-env=<env>` first.")?;
 
-    let value = api::fetch_secrets(app, env, token)?;
+    let value = api::fetch_secrets(app, env, &token)?;
 
     if as_json {
-        println!("{}", serde_json::to_string_pretty(&value).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&value).unwrap_or_default()
+        );
     } else if let Some(obj) = value.as_object() {
         for (key, val) in obj {
-            let plain = val.as_str().map(|s| s.to_owned()).unwrap_or_else(|| val.to_string());
+            let plain = val
+                .as_str()
+                .map(|s| s.to_owned())
+                .unwrap_or_else(|| val.to_string());
             println!("{key}={}", api::obfuscate(&plain));
         }
     } else {
