@@ -115,6 +115,7 @@ fn fetch_latest() -> Result<serde_json::Value, String> {
 }
 
 fn find_asset_url(release: &serde_json::Value) -> Result<String, String> {
+    let has_token = github_token().is_some();
     let assets = release["assets"]
         .as_array()
         .ok_or("GitHub API response missing 'assets'")?;
@@ -129,9 +130,16 @@ fn find_asset_url(release: &serde_json::Value) -> Result<String, String> {
         if let Some(name) = asset["name"].as_str()
             && name.ends_with(&suffix)
         {
-            let url = asset["browser_download_url"]
+            // Private repos: use the API URL with Accept: application/octet-stream.
+            // Public repos: use browser_download_url (no auth needed).
+            let url_field = if has_token {
+                "url"
+            } else {
+                "browser_download_url"
+            };
+            let url = asset[url_field]
                 .as_str()
-                .ok_or("asset missing 'browser_download_url'")?;
+                .ok_or(format!("asset missing '{url_field}'"))?;
             return Ok(url.to_owned());
         }
     }
@@ -147,6 +155,8 @@ fn download(url: &str) -> Result<Vec<u8>, String> {
 
     if let Some(token) = github_token() {
         req = req.header("Authorization", &format!("Bearer {token}"));
+        // API asset URLs require Accept: application/octet-stream to get the binary.
+        req = req.header("Accept", "application/octet-stream");
     }
 
     let mut resp = req.call().map_err(|e| format!("download failed: {e}"))?;
