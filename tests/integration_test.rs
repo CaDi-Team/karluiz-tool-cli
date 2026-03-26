@@ -89,7 +89,7 @@ fn auth_status_runs() {
         .expect("failed to run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("kenv:"));
+    assert!(stdout.contains("kenv"));
 }
 
 #[test]

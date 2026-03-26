@@ -90,11 +90,22 @@ pub fn run() -> Result<(), String> {
 // Network helpers
 // ---------------------------------------------------------------------------
 
+/// Returns the `$GITHUB_TOKEN` value if set and non-empty.
+fn github_token() -> Option<String> {
+    std::env::var("GITHUB_TOKEN").ok().filter(|t| !t.is_empty())
+}
+
 fn fetch_latest() -> Result<serde_json::Value, String> {
     let ua = format!("ktool/{}", env!("CARGO_PKG_VERSION"));
-    let mut resp = ureq::get(RELEASES_API)
+    let mut req = ureq::get(RELEASES_API)
         .header("User-Agent", &ua)
-        .header("Accept", "application/vnd.github.v3+json")
+        .header("Accept", "application/vnd.github.v3+json");
+
+    if let Some(token) = github_token() {
+        req = req.header("Authorization", &format!("Bearer {token}"));
+    }
+
+    let mut resp = req
         .call()
         .map_err(|e| format!("failed to fetch latest release: {e}"))?;
 
@@ -132,10 +143,13 @@ fn find_asset_url(release: &serde_json::Value) -> Result<String, String> {
 
 fn download(url: &str) -> Result<Vec<u8>, String> {
     let ua = format!("ktool/{}", env!("CARGO_PKG_VERSION"));
-    let mut resp = ureq::get(url)
-        .header("User-Agent", &ua)
-        .call()
-        .map_err(|e| format!("download failed: {e}"))?;
+    let mut req = ureq::get(url).header("User-Agent", &ua);
+
+    if let Some(token) = github_token() {
+        req = req.header("Authorization", &format!("Bearer {token}"));
+    }
+
+    let mut resp = req.call().map_err(|e| format!("download failed: {e}"))?;
 
     resp.body_mut()
         .read_to_vec()

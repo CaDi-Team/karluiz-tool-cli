@@ -98,13 +98,18 @@ pub fn save_kenv_token_to(path: &Path, token: &str) -> Result<(), String> {
 
 /// Load a token from the given path. Returns `Ok(None)` if the file does not exist.
 pub fn load_kenv_token_from(path: &Path) -> Result<Option<String>, String> {
+    Ok(load_kenv_token_data_from(path)?.map(|d| d.token))
+}
+
+/// Load the full [`TokenData`] from the given path. Returns `Ok(None)` if the file does not exist.
+pub fn load_kenv_token_data_from(path: &Path) -> Result<Option<TokenData>, String> {
     if !path.exists() {
         return Ok(None);
     }
     let raw = fs::read_to_string(path).map_err(|e| format!("failed to read token: {e}"))?;
     let data: TokenData =
         serde_json::from_str(&raw).map_err(|e| format!("failed to parse token: {e}"))?;
-    Ok(Some(data.token))
+    Ok(Some(data))
 }
 
 /// Remove the token file at the given path. Idempotent.
@@ -165,11 +170,32 @@ pub fn kenv_login(token: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// `ktool auth kenv whoami` — show current token (obfuscated).
+/// `ktool auth kenv whoami` — show current token and validate it against the API.
 pub fn kenv_whoami() -> Result<(), String> {
     let token = load_kenv_token()?;
+
+    // Validate the token by making a test request (same endpoint as login).
+    let client = reqwest::blocking::Client::new();
+    let url = format!("{}?app=__ping&env=__ping", crate::api::BASE_URL);
+    let resp = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("Accept", "application/json")
+        .send()
+        .map_err(|e| format!("token validation request failed: {e}"))?;
+
+    if resp.status() == reqwest::StatusCode::UNAUTHORIZED
+        || resp.status() == reqwest::StatusCode::FORBIDDEN
+    {
+        println!(
+            "Token {} is INVALID or expired.",
+            crate::api::obfuscate(&token)
+        );
+        return Err("stored token is no longer valid".to_string());
+    }
+
     println!(
-        "Authenticated with kenv token: {}",
+        "Authenticated with kenv token: {} (valid)",
         crate::api::obfuscate(&token)
     );
     Ok(())
@@ -186,20 +212,20 @@ pub fn kenv_logout() -> Result<(), String> {
 /// `ktool auth status` — show authentication status for all providers.
 pub fn status() -> Result<(), String> {
     let path = kenv_token_path()?;
-    match load_kenv_token_from(&path)? {
-        Some(tok) => println!("kenv: authenticated ({})", crate::api::obfuscate(&tok)),
+    match load_kenv_token_data_from(&path)? {
+        Some(data) => println!("kenv\t[ok] configured\tstored {}", data.stored_at),
         None => {
             if let Ok(tok) = std::env::var("KENV_API_TOKEN") {
                 if !tok.is_empty() {
                     println!(
-                        "kenv: authenticated via $KENV_API_TOKEN ({})",
+                        "kenv\t[ok] configured via $KENV_API_TOKEN ({})",
                         crate::api::obfuscate(&tok)
                     );
                 } else {
-                    println!("kenv: not authenticated");
+                    println!("kenv\t[--] not authenticated");
                 }
             } else {
-                println!("kenv: not authenticated");
+                println!("kenv\t[--] not authenticated");
             }
         }
     }
@@ -207,9 +233,28 @@ pub fn status() -> Result<(), String> {
 }
 
 /// `ktool auth logout` — remove all stored tokens.
+///
+/// Scans `~/.ktool/tokens/` for `.json` files and removes them all.
+/// Returns after printing how many files were removed.
 pub fn logout_all() -> Result<(), String> {
-    kenv_logout()?;
-    println!("All tokens removed.");
+    let tokens_dir = ktool_dir()?.join("tokens");
+    let mut removed = 0u32;
+
+    if tokens_dir.is_dir() {
+        let entries = fs::read_dir(&tokens_dir)
+            .map_err(|e| format!("failed to read tokens directory: {e}"))?;
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("failed to read directory entry: {e}"))?;
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                fs::remove_file(&path)
+                    .map_err(|e| format!("failed to remove {}: {e}", path.display()))?;
+                removed += 1;
+            }
+        }
+    }
+
+    println!("All tokens removed ({removed} file(s)).");
     Ok(())
 }
 

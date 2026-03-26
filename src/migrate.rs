@@ -30,6 +30,15 @@ struct OldConfig {
     env: Option<String>,
 }
 
+/// Cleaned version of the old config (token stripped) for rewriting.
+#[derive(serde::Serialize)]
+struct OldConfigClean {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    app: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    env: Option<String>,
+}
+
 /// Run the migration. Silently succeeds if nothing to migrate.
 pub fn run() {
     if let Err(e) = try_migrate() {
@@ -69,11 +78,34 @@ fn try_migrate() -> Result<(), String> {
         let new_config_path = ktool.join("config.toml");
         if !new_config_path.exists() {
             let cfg = crate::config::Config {
-                app: old.app,
-                env: old.env,
+                app: old.app.clone(),
+                env: old.env.clone(),
             };
             crate::config::save_to(&new_config_path, &cfg)?;
             eprintln!("Migrated config to {}.", new_config_path.display());
+        }
+    }
+
+    // Rewrite the old config without the token field (or delete if nothing remains).
+    if old.token.is_some() {
+        if old.app.is_some() || old.env.is_some() {
+            // Keep only app/env in the old file.
+            let cleaned = OldConfigClean {
+                app: old.app,
+                env: old.env,
+            };
+            let content = toml::to_string_pretty(&cleaned)
+                .map_err(|e| format!("failed to serialize cleaned config: {e}"))?;
+            fs::write(&old_path, content)
+                .map_err(|e| format!("failed to rewrite old config: {e}"))?;
+            eprintln!(
+                "Removed token field from old config at {}.",
+                old_path.display()
+            );
+        } else {
+            // Nothing left — remove the old file entirely.
+            fs::remove_file(&old_path).map_err(|e| format!("failed to remove old config: {e}"))?;
+            eprintln!("Removed old config at {}.", old_path.display());
         }
     }
 
