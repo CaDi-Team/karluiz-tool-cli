@@ -3,107 +3,120 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
 env:
   CARGO_TERM_COLOR: always
-  BIN_NAME: ktool
+  BINARY_NAME: ktool
+  ZIG_VERSION: "0.13.0"
 
 permissions:
-  contents: write   # needed to create/upload the GitHub Release
+  contents: write
 
 jobs:
-  # ── build ──────────────────────────────────────────────────────────────────
   build:
     name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: cadi-hq-runner-dind-set
+
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Linux x86_64 (most CI runners, most dev machines)
+          # Linux musl static (x86_64) — cargo-zigbuild (Zig ships musl libc).
           - target: x86_64-unknown-linux-musl
-            runner: ubuntu-latest
-            archive: ktool-x86_64-unknown-linux-musl.tar.gz
+            tool: zigbuild
+            archive: tar.gz
 
-          # Linux ARM64 (Graviton, Raspberry Pi 4+, etc.)
+          # Linux musl static (ARM64) — cargo-zigbuild.
           - target: aarch64-unknown-linux-musl
-            runner: ubuntu-latest
-            archive: ktool-aarch64-unknown-linux-musl.tar.gz
+            tool: zigbuild
+            archive: tar.gz
 
-          # macOS Intel
+          # macOS Intel — cargo-zigbuild.
           - target: x86_64-apple-darwin
-            runner: macos-latest
-            archive: ktool-x86_64-apple-darwin.tar.gz
+            tool: zigbuild
+            archive: tar.gz
 
-          # macOS Apple Silicon
+          # macOS Apple Silicon — cargo-zigbuild.
           - target: aarch64-apple-darwin
-            runner: macos-latest
-            archive: ktool-aarch64-apple-darwin.tar.gz
+            tool: zigbuild
+            archive: tar.gz
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable + target
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential xz-utils
+
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - name: Cache Cargo
+      - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-${{ matrix.target }}-cargo-
+          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ matrix.target }}-cargo-
 
-      # cross is the easiest way to build musl/ARM on a GitHub-hosted runner
-      - name: Install cross (Linux targets)
-        if: runner.os == 'Linux'
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
+      - name: Install Zig + cargo-zigbuild
+        if: matrix.tool == 'zigbuild'
+        run: |
+          ZIG="zig-linux-x86_64-${ZIG_VERSION}"
+          curl -fsSL "https://ziglang.org/download/${ZIG_VERSION}/${ZIG}.tar.xz" \
+            | tar -xJ -C /tmp
+          sudo mv "/tmp/${ZIG}" /opt/zig
+          sudo ln -sf /opt/zig/zig /usr/local/bin/zig
+          zig version
+          cargo install cargo-zigbuild --locked
 
-      - name: Build (Linux — cross)
-        if: runner.os == 'Linux'
-        run: cross build --release --locked --target ${{ matrix.target }}
+      - name: Build (zigbuild)
+        if: matrix.tool == 'zigbuild'
+        run: cargo zigbuild --release --target ${{ matrix.target }}
 
-      - name: Build (macOS — native cargo)
-        if: runner.os == 'macOS'
-        run: cargo build --release --locked --target ${{ matrix.target }}
-
-      - name: Package binary
+      - name: Create archive (tar.gz)
+        if: matrix.archive == 'tar.gz'
         shell: bash
         run: |
-          BINARY="target/${{ matrix.target }}/release/${{ env.BIN_NAME }}"
-          tar -czvf "${{ matrix.archive }}" -C "$(dirname "$BINARY")" "$(basename "$BINARY")"
+          BIN="target/${{ matrix.target }}/release/${BINARY_NAME}"
+          ARCHIVE="${BINARY_NAME}-${{ github.ref_name }}-${{ matrix.target }}.tar.gz"
+          tar -czf "${ARCHIVE}" -C "$(dirname "${BIN}")" "$(basename "${BIN}")"
+          echo "ASSET=${ARCHIVE}" >> "${GITHUB_ENV}"
 
-      # Upload as a workflow artifact so other pipelines can consume it
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.archive }}
-          path: ${{ matrix.archive }}
-          retention-days: 90
+          name: ${{ env.BINARY_NAME }}-${{ github.ref_name }}-${{ matrix.target }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
 
-  # ── release ────────────────────────────────────────────────────────────────
   release:
-    name: Create GitHub Release
+    name: Publish GitHub Release
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: cadi-hq-runner-dind-set
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4.2.0
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: Create release and upload assets
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
           generate_release_notes: true
-          files: artifacts/*.tar.gz
+          files: artifacts/**
