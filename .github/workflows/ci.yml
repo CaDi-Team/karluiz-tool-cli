@@ -11,7 +11,7 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: cadi-hq-runner-dind-set
+    runs-on: [cadi-hq-runner-dind-set-v2, cadi-hq-runner-dind-set]
 
     steps:
       - uses: actions/checkout@v4
