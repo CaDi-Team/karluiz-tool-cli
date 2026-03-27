@@ -7,6 +7,7 @@
 //! "Already up to date" and exits 0.
 
 use std::fs;
+use std::io::Read;
 
 // ---------------------------------------------------------------------------
 // Compile-time target detection
@@ -98,19 +99,18 @@ fn github_token() -> Option<String> {
 fn fetch_latest() -> Result<serde_json::Value, String> {
     let ua = format!("ktool/{}", env!("CARGO_PKG_VERSION"));
     let mut req = ureq::get(RELEASES_API)
-        .header("User-Agent", &ua)
-        .header("Accept", "application/vnd.github.v3+json");
+        .set("User-Agent", &ua)
+        .set("Accept", "application/vnd.github.v3+json");
 
     if let Some(token) = github_token() {
-        req = req.header("Authorization", &format!("Bearer {token}"));
+        req = req.set("Authorization", &format!("Bearer {token}"));
     }
 
-    let mut resp = req
+    let resp = req
         .call()
         .map_err(|e| format!("failed to fetch latest release: {e}"))?;
 
-    resp.body_mut()
-        .read_json::<serde_json::Value>()
+    resp.into_json::<serde_json::Value>()
         .map_err(|e| format!("failed to parse release JSON: {e}"))
 }
 
@@ -151,19 +151,21 @@ fn find_asset_url(release: &serde_json::Value) -> Result<String, String> {
 
 fn download(url: &str) -> Result<Vec<u8>, String> {
     let ua = format!("ktool/{}", env!("CARGO_PKG_VERSION"));
-    let mut req = ureq::get(url).header("User-Agent", &ua);
+    let mut req = ureq::get(url).set("User-Agent", &ua);
 
     if let Some(token) = github_token() {
-        req = req.header("Authorization", &format!("Bearer {token}"));
+        req = req.set("Authorization", &format!("Bearer {token}"));
         // API asset URLs require Accept: application/octet-stream to get the binary.
-        req = req.header("Accept", "application/octet-stream");
+        req = req.set("Accept", "application/octet-stream");
     }
 
-    let mut resp = req.call().map_err(|e| format!("download failed: {e}"))?;
+    let resp = req.call().map_err(|e| format!("download failed: {e}"))?;
 
-    resp.body_mut()
-        .read_to_vec()
-        .map_err(|e| format!("failed to read download body: {e}"))
+    let mut buf = Vec::new();
+    resp.into_reader()
+        .read_to_end(&mut buf)
+        .map_err(|e| format!("failed to read download body: {e}"))?;
+    Ok(buf)
 }
 
 // ---------------------------------------------------------------------------

@@ -149,19 +149,20 @@ pub fn kenv_login(token: &str) -> Result<(), String> {
     }
 
     // Validate the token by calling the API.
-    let client = reqwest::blocking::Client::new();
     let url = format!("{}?app=__ping&env=__ping", crate::api::BASE_URL);
-    let resp = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {token}"))
-        .header("Accept", "application/json")
-        .send()
-        .map_err(|e| format!("token validation request failed: {e}"))?;
+    let resp = ureq::get(&url)
+        .set("Authorization", &format!("Bearer {token}"))
+        .set("Accept", "application/json")
+        .call();
 
-    if resp.status() == reqwest::StatusCode::UNAUTHORIZED
-        || resp.status() == reqwest::StatusCode::FORBIDDEN
-    {
-        return Err("token is invalid or expired".to_string());
+    match &resp {
+        Err(ureq::Error::Status(401 | 403, _)) => {
+            return Err("token is invalid or expired".to_string());
+        }
+        Err(e) => {
+            return Err(format!("token validation request failed: {e}"));
+        }
+        Ok(_) => {}
     }
 
     let path = kenv_token_path()?;
@@ -175,18 +176,13 @@ pub fn kenv_whoami() -> Result<(), String> {
     let token = load_kenv_token()?;
 
     // Validate the token by making a test request (same endpoint as login).
-    let client = reqwest::blocking::Client::new();
     let url = format!("{}?app=__ping&env=__ping", crate::api::BASE_URL);
-    let resp = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {token}"))
-        .header("Accept", "application/json")
-        .send()
-        .map_err(|e| format!("token validation request failed: {e}"))?;
+    let resp = ureq::get(&url)
+        .set("Authorization", &format!("Bearer {token}"))
+        .set("Accept", "application/json")
+        .call();
 
-    if resp.status() == reqwest::StatusCode::UNAUTHORIZED
-        || resp.status() == reqwest::StatusCode::FORBIDDEN
-    {
+    if matches!(&resp, Err(ureq::Error::Status(401 | 403, _))) {
         println!(
             "Token {} is INVALID or expired.",
             crate::api::obfuscate(&token)
