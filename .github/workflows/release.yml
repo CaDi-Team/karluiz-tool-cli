@@ -48,7 +48,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends build-essential xz-utils
+          sudo apt-get install -y --no-install-recommends build-essential gcc xz-utils musl-tools
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
