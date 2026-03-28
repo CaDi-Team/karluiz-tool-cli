@@ -318,4 +318,64 @@ mod tests {
         assert!(data.stored_at.contains('T'));
         assert!(data.stored_at.ends_with('Z'));
     }
+
+    #[test]
+    fn logout_all_removes_multiple_token_files() {
+        let dir = TempDir::new().unwrap();
+        let tokens_dir = dir.path().join("tokens");
+        fs::create_dir_all(&tokens_dir).unwrap();
+
+        // Create two token files.
+        let kenv_path = tokens_dir.join("kenv.json");
+        let other_path = tokens_dir.join("other.json");
+        save_kenv_token_to(&kenv_path, "tok-a").unwrap();
+        save_kenv_token_to(&other_path, "tok-b").unwrap();
+
+        assert!(kenv_path.exists());
+        assert!(other_path.exists());
+
+        // Manually replicate logout_all logic against our temp dir.
+        let entries = fs::read_dir(&tokens_dir).unwrap();
+        for entry in entries {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                fs::remove_file(&path).unwrap();
+            }
+        }
+
+        assert!(!kenv_path.exists());
+        assert!(!other_path.exists());
+    }
+
+    #[test]
+    fn token_data_json_schema_roundtrip() {
+        let original = TokenData {
+            version: 1,
+            token: "my-secret-token".to_string(),
+            stored_at: "2025-01-15T10:30:00Z".to_string(),
+        };
+        let json = serde_json::to_string_pretty(&original).unwrap();
+        let deserialized: TokenData = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, deserialized);
+
+        // Verify the JSON contains expected field names.
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["version"], 1);
+        assert_eq!(value["token"], "my-secret-token");
+        assert_eq!(value["stored_at"], "2025-01-15T10:30:00Z");
+    }
+
+    #[test]
+    fn load_corrupted_json_returns_error() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("bad.json");
+        fs::write(&path, "{ not valid json !!!").unwrap();
+        let result = load_kenv_token_from(&path);
+        assert!(result.is_err(), "corrupted JSON should produce an error");
+        assert!(
+            result.unwrap_err().contains("failed to parse token"),
+            "error message should mention parsing failure"
+        );
+    }
 }

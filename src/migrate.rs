@@ -111,3 +111,15 @@ fn try_migrate() -> Result<(), String> {
 
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+//
+// The migration logic in `try_migrate()` uses hardcoded real paths
+// (`dirs::config_dir()` and `ktool_dir()`) with no path-injection seam.
+// Refactoring those internal helpers to accept a root directory parameter
+// would make them testable in isolation, but that is a testability refactor
+// outside the scope of this change.
+//
+// Migration is covered by integration tests that exercise `ktool` end-to-end.

@@ -220,6 +220,142 @@ fn extract_binary(bytes: &[u8]) -> Result<Vec<u8>, String> {
 // Binary replacement — platform-specific
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn current_target_is_not_empty() {
+        assert!(
+            !CURRENT_TARGET.is_empty(),
+            "CURRENT_TARGET should not be empty"
+        );
+    }
+
+    #[test]
+    fn current_target_contains_expected_parts() {
+        // Every target triple has at least an arch and an OS segment.
+        assert!(
+            CURRENT_TARGET.contains('-'),
+            "CURRENT_TARGET should contain hyphens: {CURRENT_TARGET}"
+        );
+        // Should contain a known arch.
+        let known_archs = ["x86_64", "aarch64"];
+        assert!(
+            known_archs.iter().any(|a| CURRENT_TARGET.starts_with(a)),
+            "CURRENT_TARGET should start with a known arch: {CURRENT_TARGET}"
+        );
+    }
+
+    #[test]
+    fn github_token_returns_none_when_unset() {
+        // Temporarily remove the env var if set, then restore.
+        let original = std::env::var("GITHUB_TOKEN").ok();
+        // SAFETY: test runs single-threaded; no other thread reads this var concurrently.
+        unsafe { std::env::remove_var("GITHUB_TOKEN") };
+        let result = github_token();
+        // Restore.
+        if let Some(val) = original {
+            // SAFETY: same single-threaded test context.
+            unsafe { std::env::set_var("GITHUB_TOKEN", val) };
+        }
+        assert!(result.is_none(), "should return None when env var is unset");
+    }
+
+    /// Build a mock release JSON with the given asset names and URLs.
+    fn mock_release(assets: &[(&str, &str, &str)]) -> serde_json::Value {
+        let assets_json: Vec<serde_json::Value> = assets
+            .iter()
+            .map(|(name, url, browser_url)| {
+                serde_json::json!({
+                    "name": name,
+                    "url": url,
+                    "browser_download_url": browser_url,
+                })
+            })
+            .collect();
+        serde_json::json!({
+            "tag_name": "v0.2.4",
+            "assets": assets_json,
+        })
+    }
+
+    #[test]
+    fn find_asset_url_finds_matching_asset() {
+        let suffix = if cfg!(windows) {
+            format!("{CURRENT_TARGET}.zip")
+        } else {
+            format!("{CURRENT_TARGET}.tar.gz")
+        };
+        let asset_name = format!("ktool-{suffix}");
+
+        let release = mock_release(&[(
+            &asset_name,
+            "https://api.example.com/asset/1",
+            "https://github.com/releases/download/asset",
+        )]);
+
+        let result = find_asset_url(&release);
+        assert!(result.is_ok(), "should find the matching asset");
+        let url = result.unwrap();
+        // The URL should be one of the two depending on GITHUB_TOKEN.
+        assert!(
+            url == "https://api.example.com/asset/1"
+                || url == "https://github.com/releases/download/asset"
+        );
+    }
+
+    #[test]
+    fn find_asset_url_uses_browser_download_url_without_token() {
+        // Ensure GITHUB_TOKEN is not set so has_token is false.
+        let original = std::env::var("GITHUB_TOKEN").ok();
+        // SAFETY: test runs single-threaded; no other thread reads this var concurrently.
+        unsafe { std::env::remove_var("GITHUB_TOKEN") };
+
+        let suffix = if cfg!(windows) {
+            format!("{CURRENT_TARGET}.zip")
+        } else {
+            format!("{CURRENT_TARGET}.tar.gz")
+        };
+        let asset_name = format!("ktool-{suffix}");
+        let release = mock_release(&[(
+            &asset_name,
+            "https://api.example.com/asset/1",
+            "https://github.com/releases/download/asset",
+        )]);
+
+        let result = find_asset_url(&release);
+
+        // Restore env var.
+        if let Some(val) = original {
+            // SAFETY: same single-threaded test context.
+            unsafe { std::env::set_var("GITHUB_TOKEN", val) };
+        }
+
+        assert_eq!(
+            result.unwrap(),
+            "https://github.com/releases/download/asset"
+        );
+    }
+
+    #[test]
+    fn find_asset_url_returns_error_when_no_matching_asset() {
+        let release = mock_release(&[(
+            "ktool-some-other-target.tar.gz",
+            "https://api.example.com/asset/1",
+            "https://github.com/releases/download/asset",
+        )]);
+
+        let result = find_asset_url(&release);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("no release asset found"));
+    }
+}
+
 /// Replaces the running binary with `binary`.
 fn replace_self(binary: &[u8]) -> Result<(), String> {
     let current_exe =

@@ -118,4 +118,51 @@ mod tests {
         assert_eq!(loaded.app, Some("my-app".to_string()));
         assert_eq!(loaded.env, Some("prod".to_string()));
     }
+
+    #[test]
+    fn config_with_only_app_saves_and_loads() {
+        let (_dir, path) = temp_config_path();
+        let cfg = Config {
+            app: Some("only-app".to_string()),
+            env: None,
+        };
+        save_to(&path, &cfg).unwrap();
+        let loaded = load_from(&path).unwrap();
+        assert_eq!(loaded.app, Some("only-app".to_string()));
+        assert_eq!(loaded.env, None);
+    }
+
+    #[test]
+    fn config_with_only_env_saves_and_loads() {
+        let (_dir, path) = temp_config_path();
+        let cfg = Config {
+            app: None,
+            env: Some("staging".to_string()),
+        };
+        save_to(&path, &cfg).unwrap();
+        let loaded = load_from(&path).unwrap();
+        assert_eq!(loaded.app, None);
+        assert_eq!(loaded.env, Some("staging".to_string()));
+    }
+
+    #[test]
+    fn empty_string_values_are_preserved() {
+        let (_dir, path) = temp_config_path();
+        let cfg = Config {
+            app: Some("".to_string()),
+            env: Some("".to_string()),
+        };
+        save_to(&path, &cfg).unwrap();
+        let loaded = load_from(&path).unwrap();
+        assert_eq!(
+            loaded.app,
+            Some("".to_string()),
+            "empty app should be preserved as Some(\"\")"
+        );
+        assert_eq!(
+            loaded.env,
+            Some("".to_string()),
+            "empty env should be preserved as Some(\"\")"
+        );
+    }
 }
