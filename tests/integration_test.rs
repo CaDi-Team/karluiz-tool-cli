@@ -37,8 +37,8 @@ fn help_flag() {
 }
 
 #[test]
-fn cadi_hero_screen() {
-    let output = ktool().arg("cadi").output().expect("failed to run");
+fn magic_hero_screen() {
+    let output = ktool().arg("magic").output().expect("failed to run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("DEVELOPER BY PASSION"));

@@ -20,7 +20,7 @@ pub enum Commands {
     Version,
 
     /// Show the karluiz 8-bit hero screen.
-    Cadi,
+    Magic,
 
     /// Self-update to the latest release from GitHub.
     Update,
@@ -56,7 +56,7 @@ fn main() {
             println!("ktool {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
-        Some(Commands::Cadi) => {
+        Some(Commands::Magic) => {
             commands::cadi::run();
             Ok(())
         }

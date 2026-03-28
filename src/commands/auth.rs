@@ -149,6 +149,8 @@ pub fn kenv_login(token: &str) -> Result<(), String> {
     }
 
     // Validate the token by calling the API.
+    // A 404 is fine — it means "authenticated but app not found", which proves the token works.
+    // Only 401/403 means the token itself is bad.
     let url = format!("{}?app=__ping&env=__ping", crate::api::BASE_URL);
     let resp = ureq::get(&url)
         .set("Authorization", &format!("Bearer {token}"))
@@ -159,8 +161,12 @@ pub fn kenv_login(token: &str) -> Result<(), String> {
         Err(ureq::Error::Status(401 | 403, _)) => {
             return Err("token is invalid or expired".to_string());
         }
-        Err(e) => {
-            return Err(format!("token validation request failed: {e}"));
+        Err(ureq::Error::Status(_, _)) => {
+            // Any other HTTP status (404, 500, etc.) means the server responded,
+            // so the token was accepted. Proceed with saving.
+        }
+        Err(ureq::Error::Transport(e)) => {
+            return Err(format!("could not reach karluiz API: {e}"));
         }
         Ok(_) => {}
     }
@@ -176,18 +182,25 @@ pub fn kenv_whoami() -> Result<(), String> {
     let token = load_kenv_token()?;
 
     // Validate the token by making a test request (same endpoint as login).
+    // Only 401/403 means invalid — 404 or other codes mean token is accepted.
     let url = format!("{}?app=__ping&env=__ping", crate::api::BASE_URL);
     let resp = ureq::get(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .set("Accept", "application/json")
         .call();
 
-    if matches!(&resp, Err(ureq::Error::Status(401 | 403, _))) {
-        println!(
-            "Token {} is INVALID or expired.",
-            crate::api::obfuscate(&token)
-        );
-        return Err("stored token is no longer valid".to_string());
+    match &resp {
+        Err(ureq::Error::Status(401 | 403, _)) => {
+            println!(
+                "Token {} is INVALID or expired.",
+                crate::api::obfuscate(&token)
+            );
+            return Err("stored token is no longer valid".to_string());
+        }
+        Err(ureq::Error::Transport(e)) => {
+            return Err(format!("could not reach karluiz API: {e}"));
+        }
+        _ => {} // Any HTTP response (including 404) = token accepted
     }
 
     println!(
