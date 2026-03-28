@@ -22,7 +22,7 @@ toml = "1"
 # ureq v2: sync HTTP client with rustls (pure Rust TLS, no C deps).
 # Matches diegops stack — cross-compiles cleanly with zigbuild for all targets.
 ureq = { version = "2", default-features = false, features = ["tls", "json"] }
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 tempfile = "3"
