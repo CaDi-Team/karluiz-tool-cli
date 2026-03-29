@@ -253,10 +253,7 @@ mod tests {
         };
         let asset_name = format!("ktool-{suffix}");
 
-        let release = mock_release(&[(
-            &asset_name,
-            "https://github.com/releases/download/asset",
-        )]);
+        let release = mock_release(&[(&asset_name, "https://github.com/releases/download/asset")]);
 
         let url = find_asset_url(&release).expect("should find the matching asset");
         assert_eq!(url, "https://github.com/releases/download/asset");
