@@ -91,22 +91,11 @@ pub fn run() -> Result<(), String> {
 // Network helpers
 // ---------------------------------------------------------------------------
 
-/// Returns the `$GITHUB_TOKEN` value if set and non-empty.
-fn github_token() -> Option<String> {
-    std::env::var("GITHUB_TOKEN").ok().filter(|t| !t.is_empty())
-}
-
 fn fetch_latest() -> Result<serde_json::Value, String> {
     let ua = format!("ktool/{}", env!("CARGO_PKG_VERSION"));
-    let mut req = ureq::get(RELEASES_API)
+    let resp = ureq::get(RELEASES_API)
         .set("User-Agent", &ua)
-        .set("Accept", "application/vnd.github.v3+json");
-
-    if let Some(token) = github_token() {
-        req = req.set("Authorization", &format!("Bearer {token}"));
-    }
-
-    let resp = req
+        .set("Accept", "application/vnd.github.v3+json")
         .call()
         .map_err(|e| format!("failed to fetch latest release: {e}"))?;
 
@@ -115,7 +104,6 @@ fn fetch_latest() -> Result<serde_json::Value, String> {
 }
 
 fn find_asset_url(release: &serde_json::Value) -> Result<String, String> {
-    let has_token = github_token().is_some();
     let assets = release["assets"]
         .as_array()
         .ok_or("GitHub API response missing 'assets'")?;
@@ -130,16 +118,9 @@ fn find_asset_url(release: &serde_json::Value) -> Result<String, String> {
         if let Some(name) = asset["name"].as_str()
             && name.ends_with(&suffix)
         {
-            // Private repos: use the API URL with Accept: application/octet-stream.
-            // Public repos: use browser_download_url (no auth needed).
-            let url_field = if has_token {
-                "url"
-            } else {
-                "browser_download_url"
-            };
-            let url = asset[url_field]
+            let url = asset["browser_download_url"]
                 .as_str()
-                .ok_or(format!("asset missing '{url_field}'"))?;
+                .ok_or("asset missing 'browser_download_url'")?;
             return Ok(url.to_owned());
         }
     }
@@ -151,15 +132,10 @@ fn find_asset_url(release: &serde_json::Value) -> Result<String, String> {
 
 fn download(url: &str) -> Result<Vec<u8>, String> {
     let ua = format!("ktool/{}", env!("CARGO_PKG_VERSION"));
-    let mut req = ureq::get(url).set("User-Agent", &ua);
-
-    if let Some(token) = github_token() {
-        req = req.set("Authorization", &format!("Bearer {token}"));
-        // API asset URLs require Accept: application/octet-stream to get the binary.
-        req = req.set("Accept", "application/octet-stream");
-    }
-
-    let resp = req.call().map_err(|e| format!("download failed: {e}"))?;
+    let resp = ureq::get(url)
+        .set("User-Agent", &ua)
+        .call()
+        .map_err(|e| format!("download failed: {e}"))?;
 
     let mut buf = Vec::new();
     resp.into_reader()
@@ -251,29 +227,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn github_token_returns_none_when_unset() {
-        // Temporarily remove the env var if set, then restore.
-        let original = std::env::var("GITHUB_TOKEN").ok();
-        // SAFETY: test runs single-threaded; no other thread reads this var concurrently.
-        unsafe { std::env::remove_var("GITHUB_TOKEN") };
-        let result = github_token();
-        // Restore.
-        if let Some(val) = original {
-            // SAFETY: same single-threaded test context.
-            unsafe { std::env::set_var("GITHUB_TOKEN", val) };
-        }
-        assert!(result.is_none(), "should return None when env var is unset");
-    }
-
     /// Build a mock release JSON with the given asset names and URLs.
-    fn mock_release(assets: &[(&str, &str, &str)]) -> serde_json::Value {
+    fn mock_release(assets: &[(&str, &str)]) -> serde_json::Value {
         let assets_json: Vec<serde_json::Value> = assets
             .iter()
-            .map(|(name, url, browser_url)| {
+            .map(|(name, browser_url)| {
                 serde_json::json!({
                     "name": name,
-                    "url": url,
                     "browser_download_url": browser_url,
                 })
             })
@@ -295,58 +255,17 @@ mod tests {
 
         let release = mock_release(&[(
             &asset_name,
-            "https://api.example.com/asset/1",
             "https://github.com/releases/download/asset",
         )]);
 
-        let result = find_asset_url(&release);
-        assert!(result.is_ok(), "should find the matching asset");
-        let url = result.unwrap();
-        // The URL should be one of the two depending on GITHUB_TOKEN.
-        assert!(
-            url == "https://api.example.com/asset/1"
-                || url == "https://github.com/releases/download/asset"
-        );
-    }
-
-    #[test]
-    fn find_asset_url_uses_browser_download_url_without_token() {
-        // Ensure GITHUB_TOKEN is not set so has_token is false.
-        let original = std::env::var("GITHUB_TOKEN").ok();
-        // SAFETY: test runs single-threaded; no other thread reads this var concurrently.
-        unsafe { std::env::remove_var("GITHUB_TOKEN") };
-
-        let suffix = if cfg!(windows) {
-            format!("{CURRENT_TARGET}.zip")
-        } else {
-            format!("{CURRENT_TARGET}.tar.gz")
-        };
-        let asset_name = format!("ktool-{suffix}");
-        let release = mock_release(&[(
-            &asset_name,
-            "https://api.example.com/asset/1",
-            "https://github.com/releases/download/asset",
-        )]);
-
-        let result = find_asset_url(&release);
-
-        // Restore env var.
-        if let Some(val) = original {
-            // SAFETY: same single-threaded test context.
-            unsafe { std::env::set_var("GITHUB_TOKEN", val) };
-        }
-
-        assert_eq!(
-            result.unwrap(),
-            "https://github.com/releases/download/asset"
-        );
+        let url = find_asset_url(&release).expect("should find the matching asset");
+        assert_eq!(url, "https://github.com/releases/download/asset");
     }
 
     #[test]
     fn find_asset_url_returns_error_when_no_matching_asset() {
         let release = mock_release(&[(
             "ktool-some-other-target.tar.gz",
-            "https://api.example.com/asset/1",
             "https://github.com/releases/download/asset",
         )]);
 
