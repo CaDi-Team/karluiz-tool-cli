@@ -144,6 +144,30 @@ git push origin v1.0.0
 
 The release workflow cross-compiles for all four platforms, attaches the archives to the GitHub Release, and retains them as workflow artifacts for 90 days.
 
+## Credits — Karluiz
+
+A huge shout-out and all credit where it truly belongs: to my good friend **[Karluiz](https://karluiz.com/)**.
+
+This CLI exists only because Karluiz built the actual tools and services behind it. `ktool` is just a thin Rust wrapper to consume his work from the terminal — the real engineering, the ideas, and the hard work are **100% his**. I refuse to take credit for what he created, and I want anyone reading this to know exactly who made it possible.
+
+Karluiz is a developer who has been coding since age 7 on a Commodore 64 — over 30 years of passion poured into every project. His site is a love letter to that journey: retro pixel aesthetics, 8-bit RPG mini-games, and a growing collection of free developer tools that he builds and shares with the community. From CRM systems to hotel management platforms to his suite of ktools, everything he ships is built with genuine passion and generosity.
+
+**His tools are free.** Go check them out, explore his projects, read his blog, and see what a developer driven by pure love for the craft looks like:
+
+**[karluiz.com](https://karluiz.com/)**
+
+<p align="center">
+  <a href="https://karluiz.com/">
+    <img src="docs/images/karluiz-tools.png" alt="Karluiz Tools — a growing collection of free developer tools" width="600" />
+  </a>
+</p>
+
+> *"Every line of code is written with the same passion I felt at age 7."* — Karluiz
+
+Thank you, Karluiz. This project wouldn't exist without your work. Readers: do yourself a favor and visit his page — you won't regret it.
+
+---
+
 ## Development
 
 ```bash
