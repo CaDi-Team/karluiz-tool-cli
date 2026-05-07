@@ -456,6 +456,9 @@ fn kenv_init_force_overwrites_existing_file() {
     );
 
     let content = fs::read_to_string(&toml_path).unwrap();
-    assert!(content.contains("new-slug"), "should contain new project slug");
+    assert!(
+        content.contains("new-slug"),
+        "should contain new project slug"
+    );
     assert!(!content.contains("\"old\""), "old content should be gone");
 }

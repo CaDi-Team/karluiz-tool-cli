@@ -381,8 +381,7 @@ mod tests {
 
     #[test]
     fn kenv_apps_create_parses() {
-        let r =
-            Cli::command().try_get_matches_from(["ktool", "kenv", "apps", "create", "my-app"]);
+        let r = Cli::command().try_get_matches_from(["ktool", "kenv", "apps", "create", "my-app"]);
         assert!(r.is_ok());
     }
 
@@ -396,22 +395,20 @@ mod tests {
 
     #[test]
     fn kenv_envs_list_with_app_override_parses() {
-        let r = Cli::command()
-            .try_get_matches_from(["ktool", "kenv", "envs", "list", "--app=backend"]);
+        let r =
+            Cli::command().try_get_matches_from(["ktool", "kenv", "envs", "list", "--app=backend"]);
         assert!(r.is_ok());
     }
 
     #[test]
     fn kenv_envs_create_parses() {
-        let r = Cli::command()
-            .try_get_matches_from(["ktool", "kenv", "envs", "create", "staging"]);
+        let r = Cli::command().try_get_matches_from(["ktool", "kenv", "envs", "create", "staging"]);
         assert!(r.is_ok());
     }
 
     #[test]
     fn kenv_envs_delete_parses() {
-        let r = Cli::command()
-            .try_get_matches_from(["ktool", "kenv", "envs", "delete", "staging"]);
+        let r = Cli::command().try_get_matches_from(["ktool", "kenv", "envs", "delete", "staging"]);
         assert!(r.is_ok());
     }
 
@@ -419,8 +416,7 @@ mod tests {
 
     #[test]
     fn kenv_vars_set_single_pair_parses() {
-        let r = Cli::command()
-            .try_get_matches_from(["ktool", "kenv", "vars", "set", "KEY=value"]);
+        let r = Cli::command().try_get_matches_from(["ktool", "kenv", "vars", "set", "KEY=value"]);
         assert!(r.is_ok());
     }
 
@@ -446,8 +442,8 @@ mod tests {
 
     #[test]
     fn kenv_vars_set_short_yes_flag_parses() {
-        let r = Cli::command()
-            .try_get_matches_from(["ktool", "kenv", "vars", "set", "KEY=val", "-y"]);
+        let r =
+            Cli::command().try_get_matches_from(["ktool", "kenv", "vars", "set", "KEY=val", "-y"]);
         assert!(r.is_ok());
     }
 
@@ -468,8 +464,7 @@ mod tests {
 
     #[test]
     fn kenv_vars_delete_parses() {
-        let r = Cli::command()
-            .try_get_matches_from(["ktool", "kenv", "vars", "delete", "MY_KEY"]);
+        let r = Cli::command().try_get_matches_from(["ktool", "kenv", "vars", "delete", "MY_KEY"]);
         assert!(r.is_ok());
     }
 
@@ -489,8 +484,7 @@ mod tests {
 
     #[test]
     fn kenv_context_use_parses() {
-        let r =
-            Cli::command().try_get_matches_from(["ktool", "kenv", "context", "use", "work"]);
+        let r = Cli::command().try_get_matches_from(["ktool", "kenv", "context", "use", "work"]);
         assert!(r.is_ok());
     }
 
@@ -511,8 +505,7 @@ mod tests {
 
     #[test]
     fn kenv_context_delete_parses() {
-        let r =
-            Cli::command().try_get_matches_from(["ktool", "kenv", "context", "delete", "work"]);
+        let r = Cli::command().try_get_matches_from(["ktool", "kenv", "context", "delete", "work"]);
         assert!(r.is_ok());
     }
 

@@ -150,17 +150,12 @@ pub fn upsert_variables(
     vars: &[(String, String)],
     token: &str,
 ) -> Result<BulkUpsertResult, String> {
-    let url = format!(
-        "{}/apps/{app}/envs/{env}/vars",
-        project_url(project)
-    );
+    let url = format!("{}/apps/{app}/envs/{env}/vars", project_url(project));
 
     // Build the request body: [{key, value}, ...].
     let body: Vec<Value> = vars
         .iter()
-        .map(|(k, v)| {
-            serde_json::json!({ "key": k, "value": v })
-        })
+        .map(|(k, v)| serde_json::json!({ "key": k, "value": v }))
         .collect();
 
     let resp = bearer!(ureq::put(&url), token)
@@ -179,10 +174,7 @@ pub fn delete_variable(
     key: &str,
     token: &str,
 ) -> Result<(), String> {
-    let url = format!(
-        "{}/apps/{app}/envs/{env}/vars/{key}",
-        project_url(project)
-    );
+    let url = format!("{}/apps/{app}/envs/{env}/vars/{key}", project_url(project));
 
     bearer!(ureq::delete(&url), token)
         .call()
@@ -223,7 +215,11 @@ pub fn create_app(project: &str, name: &str, token: &str) -> Result<App, String>
 // ---------------------------------------------------------------------------
 
 /// List all environments for an app (excludes `_shared`).
-pub fn list_environments(project: &str, app: &str, token: &str) -> Result<Vec<Environment>, String> {
+pub fn list_environments(
+    project: &str,
+    app: &str,
+    token: &str,
+) -> Result<Vec<Environment>, String> {
     let url = format!("{}/apps/{app}/envs", project_url(project));
 
     let resp = bearer!(ureq::get(&url), token)
@@ -253,12 +249,7 @@ pub fn create_environment(
 /// Delete an environment and all its variables.
 ///
 /// The `_shared` environment cannot be deleted via API.
-pub fn delete_environment(
-    project: &str,
-    app: &str,
-    env: &str,
-    token: &str,
-) -> Result<(), String> {
+pub fn delete_environment(project: &str, app: &str, env: &str, token: &str) -> Result<(), String> {
     let url = format!("{}/apps/{app}/envs/{env}", project_url(project));
 
     bearer!(ureq::delete(&url), token)

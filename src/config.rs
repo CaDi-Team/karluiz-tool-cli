@@ -322,10 +322,7 @@ mod tests {
         save_to(&path, &cfg).unwrap();
         let loaded = load_from(&path).unwrap();
         assert_eq!(loaded.contexts.len(), 2);
-        assert_eq!(
-            loaded.contexts["a"].project,
-            Some("proj-a".to_string())
-        );
+        assert_eq!(loaded.contexts["a"].project, Some("proj-a".to_string()));
         assert!(loaded.contexts["b"].app.is_none());
     }
 

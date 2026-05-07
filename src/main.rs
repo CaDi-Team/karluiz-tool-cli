@@ -273,11 +273,7 @@ fn run_kenv_list(cfg: &config::Config, as_json: bool, detailed: bool) -> Result<
 // kenv apps
 // ---------------------------------------------------------------------------
 
-fn run_kenv_apps(
-    resolved: &ResolvedContext,
-    cmd: AppsCommands,
-    token: &str,
-) -> Result<(), String> {
+fn run_kenv_apps(resolved: &ResolvedContext, cmd: AppsCommands, token: &str) -> Result<(), String> {
     let project = resolved
         .project
         .as_deref()
@@ -314,18 +310,16 @@ fn run_kenv_apps(
 // kenv envs
 // ---------------------------------------------------------------------------
 
-fn run_kenv_envs(
-    resolved: &ResolvedContext,
-    cmd: EnvsCommands,
-    token: &str,
-) -> Result<(), String> {
+fn run_kenv_envs(resolved: &ResolvedContext, cmd: EnvsCommands, token: &str) -> Result<(), String> {
     match cmd {
         EnvsCommands::List(args) => {
             let project = args
                 .project
                 .as_deref()
                 .or(resolved.project.as_deref())
-                .ok_or("No project set. Use --project or set one via `ktool kenv --set-project`.")?;
+                .ok_or(
+                    "No project set. Use --project or set one via `ktool kenv --set-project`.",
+                )?;
             let app = args
                 .app
                 .as_deref()
@@ -349,7 +343,9 @@ fn run_kenv_envs(
                 .project
                 .as_deref()
                 .or(resolved.project.as_deref())
-                .ok_or("No project set. Use --project or set one via `ktool kenv --set-project`.")?;
+                .ok_or(
+                    "No project set. Use --project or set one via `ktool kenv --set-project`.",
+                )?;
             let app = args
                 .app
                 .as_deref()
@@ -357,10 +353,7 @@ fn run_kenv_envs(
                 .ok_or("No app set. Use --app or set one via `ktool kenv --set-app`.")?;
 
             let env = api::create_environment(project, app, &args.name, token)?;
-            println!(
-                "Environment '{}' created in '{project}/{app}'.",
-                env.name
-            );
+            println!("Environment '{}' created in '{project}/{app}'.", env.name);
             Ok(())
         }
 
@@ -369,7 +362,9 @@ fn run_kenv_envs(
                 .project
                 .as_deref()
                 .or(resolved.project.as_deref())
-                .ok_or("No project set. Use --project or set one via `ktool kenv --set-project`.")?;
+                .ok_or(
+                    "No project set. Use --project or set one via `ktool kenv --set-project`.",
+                )?;
             let app = args
                 .app
                 .as_deref()
@@ -390,18 +385,16 @@ fn run_kenv_envs(
 // kenv vars
 // ---------------------------------------------------------------------------
 
-fn run_kenv_vars(
-    resolved: &ResolvedContext,
-    cmd: VarsCommands,
-    token: &str,
-) -> Result<(), String> {
+fn run_kenv_vars(resolved: &ResolvedContext, cmd: VarsCommands, token: &str) -> Result<(), String> {
     match cmd {
         VarsCommands::Set(args) => {
             let project = args
                 .project
                 .as_deref()
                 .or(resolved.project.as_deref())
-                .ok_or("No project set. Use --project or set one via `ktool kenv --set-project`.")?;
+                .ok_or(
+                    "No project set. Use --project or set one via `ktool kenv --set-project`.",
+                )?;
             let app = args
                 .app
                 .as_deref()
@@ -455,7 +448,9 @@ fn run_kenv_vars(
                 .project
                 .as_deref()
                 .or(resolved.project.as_deref())
-                .ok_or("No project set. Use --project or set one via `ktool kenv --set-project`.")?;
+                .ok_or(
+                    "No project set. Use --project or set one via `ktool kenv --set-project`.",
+                )?;
             let app = args
                 .app
                 .as_deref()
@@ -468,7 +463,10 @@ fn run_kenv_vars(
                 .ok_or("No env set. Use --env or set one via `ktool kenv --set-env`.")?;
 
             api::delete_variable(project, app, env, &args.key, token)?;
-            println!("Variable '{}' deleted from {project}/{app}/{env}.", args.key);
+            println!(
+                "Variable '{}' deleted from {project}/{app}/{env}.",
+                args.key
+            );
             Ok(())
         }
     }
@@ -555,14 +553,8 @@ fn run_kenv_context(cfg: &mut config::Config, cmd: ContextCommands) -> Result<()
                 "  project : {}",
                 ctx.project.as_deref().unwrap_or("(not set)")
             );
-            println!(
-                "  app     : {}",
-                ctx.app.as_deref().unwrap_or("(not set)")
-            );
-            println!(
-                "  env     : {}",
-                ctx.env.as_deref().unwrap_or("(not set)")
-            );
+            println!("  app     : {}", ctx.app.as_deref().unwrap_or("(not set)"));
+            println!("  env     : {}", ctx.env.as_deref().unwrap_or("(not set)"));
             Ok(())
         }
 
@@ -588,8 +580,8 @@ fn run_kenv_context(cfg: &mut config::Config, cmd: ContextCommands) -> Result<()
 // ---------------------------------------------------------------------------
 
 fn run_kenv_init(resolved: &ResolvedContext, args: commands::kenv::InitArgs) -> Result<(), String> {
-    let cwd = std::env::current_dir()
-        .map_err(|e| format!("Cannot determine current directory: {e}"))?;
+    let cwd =
+        std::env::current_dir().map_err(|e| format!("Cannot determine current directory: {e}"))?;
     let path = cwd.join("ktool.toml");
 
     if path.exists() && !args.force {
@@ -614,7 +606,9 @@ fn run_kenv_init(resolved: &ResolvedContext, args: commands::kenv::InitArgs) -> 
     println!("Created {}:", path.display());
     print!("{content}");
     println!();
-    println!("This file will be picked up automatically by `ktool` in this directory and any subdirectory.");
+    println!(
+        "This file will be picked up automatically by `ktool` in this directory and any subdirectory."
+    );
     Ok(())
 }
 

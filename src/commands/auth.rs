@@ -153,7 +153,10 @@ pub fn kenv_login(token: &str) -> Result<(), String> {
     // Only 401/403 means the token itself is bad.
     // We use a hardcoded "orbital" project slug here — validation only needs
     // any valid server response, not a specific project.
-    let url = format!("{}/api/env/orbital?app=__ping&env=__ping", crate::api::API_HOST);
+    let url = format!(
+        "{}/api/env/orbital?app=__ping&env=__ping",
+        crate::api::API_HOST
+    );
     let resp = ureq::get(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .set("Accept", "application/json")
@@ -185,7 +188,10 @@ pub fn kenv_whoami() -> Result<(), String> {
 
     // Validate the token by making a test request (same endpoint as login).
     // Only 401/403 means invalid — 404 or other codes mean token is accepted.
-    let url = format!("{}/api/env/orbital?app=__ping&env=__ping", crate::api::API_HOST);
+    let url = format!(
+        "{}/api/env/orbital?app=__ping&env=__ping",
+        crate::api::API_HOST
+    );
     let resp = ureq::get(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .set("Accept", "application/json")
