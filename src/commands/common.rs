@@ -1,5 +1,6 @@
 //! Shared helpers used across command modules.
 
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 /// Returns the current user's home directory.
@@ -13,6 +14,18 @@ pub fn home_dir() -> Result<PathBuf, String> {
 /// Returns `~/.ktool/`.
 pub fn ktool_dir() -> Result<PathBuf, String> {
     Ok(home_dir()?.join(".ktool"))
+}
+
+/// Print `prompt` followed by ` [y/N] ` and read a line from stdin.
+///
+/// Returns `true` only if the user types `y` or `Y`.  Any other input
+/// (including an empty line or EOF) is treated as `N`.
+pub fn confirm(prompt: &str) -> bool {
+    print!("{prompt} [y/N] ");
+    io::stdout().flush().ok();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap_or(0);
+    matches!(input.trim(), "y" | "Y")
 }
 
 #[cfg(test)]

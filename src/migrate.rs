@@ -80,6 +80,7 @@ fn try_migrate() -> Result<(), String> {
             let cfg = crate::config::Config {
                 app: old.app.clone(),
                 env: old.env.clone(),
+                ..Default::default()
             };
             crate::config::save_to(&new_config_path, &cfg)?;
             eprintln!("Migrated config to {}.", new_config_path.display());
