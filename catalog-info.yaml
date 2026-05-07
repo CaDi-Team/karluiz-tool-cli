@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: karluiz-tool-cli
+  description: Rust CLI tool for karluiz client operations — internal tooling for managed client workflows
+  annotations:
+    github.com/project-slug: CaDi-Team/karluiz-tool-cli
+  tags:
+    - rust
+    - cli
+spec:
+  type: tool
+  lifecycle: production
+  owner: cadi-labs
+  system: cadi-developer-platform
